@@ -725,7 +725,7 @@ const ChangeMappingDialog: React.FC<ChangeMappingDialogProps> = ({ open, onClose
 
 // Get unique categories from all future processes
 const getExistingFutureCategories = () => {
-  const categoriesSet = new Set(mockFutureProcesses.map(p => p.projectSpcPath));
+  const categoriesSet = new Set(mockFutureProcesses.map(p => p.spcPath));
   return Array.from(categoriesSet).sort();
 };
 
@@ -928,7 +928,7 @@ const ProcessDetailDrawer: React.FC<ProcessDetailDrawerProps> = ({ open, onClose
               </Button>
             </Box>
             <Typography variant="body1" sx={{ mb: 2 }}>
-              {process.projectSpcPath}
+              {process.spcPath}
             </Typography>
 
             <Typography variant="subtitle2" color="text.secondary">Presentations</Typography>
@@ -1074,7 +1074,7 @@ const ProcessDetailDrawer: React.FC<ProcessDetailDrawerProps> = ({ open, onClose
     <CategorySelectionDialog
       open={showCategoryDialog}
       onClose={() => setShowCategoryDialog(false)}
-      currentCategories={[process.projectSpcPath]}
+      currentCategories={[process.spcPath]}
       onSave={handleSaveCategories}
     />
 

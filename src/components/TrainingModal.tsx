@@ -31,6 +31,7 @@ import PushPinIcon from '@mui/icons-material/PushPin';
 import LightbulbIcon from '@mui/icons-material/Lightbulb';
 import GpsFixedIcon from '@mui/icons-material/GpsFixed';
 import AssignmentIcon from '@mui/icons-material/Assignment';
+import WarningIcon from '@mui/icons-material/Warning';
 
 interface TrainingModalProps {
   open: boolean;
