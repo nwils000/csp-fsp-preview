@@ -516,6 +516,7 @@ interface ChangeMappingDialogProps {
 const ChangeMappingDialog: React.FC<ChangeMappingDialogProps> = ({ open, onClose, process }) => {
   const [mappedProcesses, setMappedProcesses] = useState<string[]>([]);
   const [showAddProcess, setShowAddProcess] = useState(false);
+  const [viewMode, setViewMode] = useState<'suggested' | 'parent' | 'all'>('suggested');
 
   React.useEffect(() => {
     if (process) {
@@ -528,6 +529,7 @@ const ChangeMappingDialog: React.FC<ChangeMappingDialogProps> = ({ open, onClose
   const handleAddProcess = (processId: string) => {
     setMappedProcesses([...mappedProcesses, processId]);
     setShowAddProcess(false);
+    setViewMode('suggested');
   };
 
   const handleRemoveProcess = (processId: string) => {
@@ -540,12 +542,23 @@ const ChangeMappingDialog: React.FC<ChangeMappingDialogProps> = ({ open, onClose
     onClose();
   };
 
+  const getParentCategory = (path: string) => {
+    const parts = path.split(' > ');
+    return parts.slice(0, -1).join(' > ');
+  };
+
+  const parentCategory = getParentCategory(process.spcPath);
+
   const suggestedProcesses = mockCurrentProcessesForMapping.filter(
     csp => csp.path === process.spcPath && !mappedProcesses.includes(csp.id)
   );
 
-  const otherProcesses = mockCurrentProcessesForMapping.filter(
-    csp => csp.path !== process.spcPath && !mappedProcesses.includes(csp.id)
+  const parentCategoryProcesses = parentCategory ? mockCurrentProcessesForMapping.filter(
+    csp => csp.path.startsWith(parentCategory) && csp.path !== process.spcPath && !mappedProcesses.includes(csp.id)
+  ) : [];
+
+  const allProcesses = mockCurrentProcessesForMapping.filter(
+    csp => !mappedProcesses.includes(csp.id)
   );
 
   return (
@@ -623,40 +636,80 @@ const ChangeMappingDialog: React.FC<ChangeMappingDialogProps> = ({ open, onClose
             </Button>
           ) : (
             <Box>
-              {suggestedProcesses.length > 0 && (
+              {/* View Mode Buttons */}
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Button
+                  size="small"
+                  variant={viewMode === 'suggested' ? 'contained' : 'outlined'}
+                  onClick={() => setViewMode('suggested')}
+                >
+                  Suggested ({suggestedProcesses.length})
+                </Button>
+                {parentCategory && (
+                  <Button
+                    size="small"
+                    variant={viewMode === 'parent' ? 'contained' : 'outlined'}
+                    onClick={() => setViewMode('parent')}
+                  >
+                    Parent Category ({parentCategoryProcesses.length})
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  variant={viewMode === 'all' ? 'contained' : 'outlined'}
+                  onClick={() => setViewMode('all')}
+                >
+                  Browse All ({allProcesses.length})
+                </Button>
+              </Box>
+
+              {/* Suggested View */}
+              {viewMode === 'suggested' && (
                 <>
-                  <Alert severity="info" sx={{ mb: 2 }} icon={<TipsAndUpdatesIcon />}>
+                  {suggestedProcesses.length > 0 ? (
+                    <>
+                      <Alert severity="info" sx={{ mb: 2 }} icon={<TipsAndUpdatesIcon />}>
+                        <Typography variant="body2">
+                          <strong>Suggested matches</strong> based on the same category: <em>{process.spcPath}</em>
+                        </Typography>
+                      </Alert>
+                      <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
+                        {suggestedProcesses.map((csp) => (
+                          <ListItem
+                            key={csp.id}
+                            button
+                            onClick={() => handleAddProcess(csp.id)}
+                            sx={{
+                              border: 1,
+                              borderColor: 'divider',
+                              borderRadius: '8px',
+                              mb: 1,
+                              '&:hover': { bgcolor: 'grey.50' }
+                            }}
+                          >
+                            <ListItemText primary={csp.name} secondary={csp.path} />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </>
+                  ) : (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      No suggested processes in the same category. Try browsing the parent category or all processes.
+                    </Alert>
+                  )}
+                </>
+              )}
+
+              {/* Parent Category View */}
+              {viewMode === 'parent' && parentCategory && (
+                <>
+                  <Alert severity="info" sx={{ mb: 2 }}>
                     <Typography variant="body2">
-                      <strong>Suggested matches</strong> based on the same category: <em>{process.spcPath}</em>
+                      <strong>Parent category:</strong> <em>{parentCategory}</em>
                     </Typography>
                   </Alert>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Suggested current processes:</Typography>
-                  <List sx={{ mb: 2 }}>
-                    {suggestedProcesses.map((csp) => (
-                      <ListItem
-                        key={csp.id}
-                        button
-                        onClick={() => handleAddProcess(csp.id)}
-                        sx={{
-                          border: 1,
-                          borderColor: 'divider',
-                          borderRadius: '8px',
-                          mb: 1,
-                          '&:hover': { bgcolor: 'grey.50' }
-                        }}
-                      >
-                        <ListItemText primary={csp.name} secondary={csp.path} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </>
-              )}
-
-              {otherProcesses.length > 0 && (
-                <>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>All current processes:</Typography>
                   <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
-                    {otherProcesses.map((csp) => (
+                    {parentCategoryProcesses.map((csp) => (
                       <ListItem
                         key={csp.id}
                         button
@@ -676,7 +729,36 @@ const ChangeMappingDialog: React.FC<ChangeMappingDialogProps> = ({ open, onClose
                 </>
               )}
 
-              <Button size="small" onClick={() => setShowAddProcess(false)}>Cancel</Button>
+              {/* All Processes View */}
+              {viewMode === 'all' && (
+                <>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>All current processes</strong> - Choose any process to map
+                    </Typography>
+                  </Alert>
+                  <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
+                    {allProcesses.map((csp) => (
+                      <ListItem
+                        key={csp.id}
+                        button
+                        onClick={() => handleAddProcess(csp.id)}
+                        sx={{
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: '8px',
+                          mb: 1,
+                          '&:hover': { bgcolor: 'grey.50' }
+                        }}
+                      >
+                        <ListItemText primary={csp.name} secondary={csp.path} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </>
+              )}
+
+              <Button size="small" onClick={() => { setShowAddProcess(false); setViewMode('suggested'); }}>Cancel</Button>
             </Box>
           )}
         </Box>

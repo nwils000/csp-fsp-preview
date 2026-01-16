@@ -471,12 +471,17 @@ interface ViewFutureMappingDialogProps {
 const ViewFutureMappingDialog: React.FC<ViewFutureMappingDialogProps> = ({ open, onClose, process }) => {
   const [mappedProcesses, setMappedProcesses] = useState<string[]>([]);
   const [showAddProcess, setShowAddProcess] = useState(false);
+  const [viewMode, setViewMode] = useState<'suggested' | 'parent' | 'all'>('suggested');
 
   React.useEffect(() => {
     if (process) {
       // In real app, fetch the actual mappings
-      // For demo, show FSP_001 as already mapped
-      setMappedProcesses(['FSP_001']);
+      // For demo, show FSP_001 as already mapped for certain processes
+      if (process.mappedStatus === 'Mapped') {
+        setMappedProcesses(['FSP_001']);
+      } else {
+        setMappedProcesses([]);
+      }
     }
   }, [process]);
 
@@ -485,6 +490,7 @@ const ViewFutureMappingDialog: React.FC<ViewFutureMappingDialogProps> = ({ open,
   const handleAddProcess = (processId: string) => {
     setMappedProcesses([...mappedProcesses, processId]);
     setShowAddProcess(false);
+    setViewMode('suggested');
   };
 
   const handleRemoveProcess = (processId: string) => {
@@ -497,12 +503,23 @@ const ViewFutureMappingDialog: React.FC<ViewFutureMappingDialogProps> = ({ open,
     onClose();
   };
 
+  const getParentCategory = (path: string) => {
+    const parts = path.split(' > ');
+    return parts.slice(0, -1).join(' > ');
+  };
+
+  const parentCategory = getParentCategory(process.spcPath);
+
   const suggestedProcesses = mockFutureProcessesForMapping.filter(
     fsp => fsp.path === process.spcPath && !mappedProcesses.includes(fsp.id)
   );
 
-  const otherProcesses = mockFutureProcessesForMapping.filter(
-    fsp => fsp.path !== process.spcPath && !mappedProcesses.includes(fsp.id)
+  const parentCategoryProcesses = parentCategory ? mockFutureProcessesForMapping.filter(
+    fsp => fsp.path.startsWith(parentCategory) && fsp.path !== process.spcPath && !mappedProcesses.includes(fsp.id)
+  ) : [];
+
+  const allProcesses = mockFutureProcessesForMapping.filter(
+    fsp => !mappedProcesses.includes(fsp.id)
   );
 
   return (
@@ -580,40 +597,80 @@ const ViewFutureMappingDialog: React.FC<ViewFutureMappingDialogProps> = ({ open,
             </Button>
           ) : (
             <Box>
-              {suggestedProcesses.length > 0 && (
+              {/* View Mode Buttons */}
+              <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                <Button
+                  size="small"
+                  variant={viewMode === 'suggested' ? 'contained' : 'outlined'}
+                  onClick={() => setViewMode('suggested')}
+                >
+                  Suggested ({suggestedProcesses.length})
+                </Button>
+                {parentCategory && (
+                  <Button
+                    size="small"
+                    variant={viewMode === 'parent' ? 'contained' : 'outlined'}
+                    onClick={() => setViewMode('parent')}
+                  >
+                    Parent Category ({parentCategoryProcesses.length})
+                  </Button>
+                )}
+                <Button
+                  size="small"
+                  variant={viewMode === 'all' ? 'contained' : 'outlined'}
+                  onClick={() => setViewMode('all')}
+                >
+                  Browse All ({allProcesses.length})
+                </Button>
+              </Box>
+
+              {/* Suggested View */}
+              {viewMode === 'suggested' && (
                 <>
-                  <Alert severity="info" sx={{ mb: 2 }} icon={<TipsAndUpdatesIcon />}>
+                  {suggestedProcesses.length > 0 ? (
+                    <>
+                      <Alert severity="info" sx={{ mb: 2 }} icon={<TipsAndUpdatesIcon />}>
+                        <Typography variant="body2">
+                          <strong>Suggested matches</strong> based on the same category: <em>{process.spcPath}</em>
+                        </Typography>
+                      </Alert>
+                      <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
+                        {suggestedProcesses.map((fsp) => (
+                          <ListItem
+                            key={fsp.id}
+                            button
+                            onClick={() => handleAddProcess(fsp.id)}
+                            sx={{
+                              border: 1,
+                              borderColor: 'divider',
+                              borderRadius: '8px',
+                              mb: 1,
+                              '&:hover': { bgcolor: 'grey.50' }
+                            }}
+                          >
+                            <ListItemText primary={fsp.name} secondary={fsp.path} />
+                          </ListItem>
+                        ))}
+                      </List>
+                    </>
+                  ) : (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                      No suggested processes in the same category. Try browsing the parent category or all processes.
+                    </Alert>
+                  )}
+                </>
+              )}
+
+              {/* Parent Category View */}
+              {viewMode === 'parent' && parentCategory && (
+                <>
+                  <Alert severity="info" sx={{ mb: 2 }}>
                     <Typography variant="body2">
-                      <strong>Suggested matches</strong> based on the same category: <em>{process.spcPath}</em>
+                      <strong>Parent category:</strong> <em>{parentCategory}</em>
                     </Typography>
                   </Alert>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Suggested future processes:</Typography>
-                  <List sx={{ mb: 2 }}>
-                    {suggestedProcesses.map((fsp) => (
-                      <ListItem
-                        key={fsp.id}
-                        button
-                        onClick={() => handleAddProcess(fsp.id)}
-                        sx={{
-                          border: 1,
-                          borderColor: 'divider',
-                          borderRadius: '8px',
-                          mb: 1,
-                          '&:hover': { bgcolor: 'grey.50' }
-                        }}
-                      >
-                        <ListItemText primary={fsp.name} secondary={fsp.path} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </>
-              )}
-
-              {otherProcesses.length > 0 && (
-                <>
-                  <Typography variant="subtitle2" sx={{ mb: 1 }}>All future processes:</Typography>
                   <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
-                    {otherProcesses.map((fsp) => (
+                    {parentCategoryProcesses.map((fsp) => (
                       <ListItem
                         key={fsp.id}
                         button
@@ -633,7 +690,36 @@ const ViewFutureMappingDialog: React.FC<ViewFutureMappingDialogProps> = ({ open,
                 </>
               )}
 
-              <Button size="small" onClick={() => setShowAddProcess(false)}>Cancel</Button>
+              {/* All Processes View */}
+              {viewMode === 'all' && (
+                <>
+                  <Alert severity="info" sx={{ mb: 2 }}>
+                    <Typography variant="body2">
+                      <strong>All future processes</strong> - Choose any process to map
+                    </Typography>
+                  </Alert>
+                  <List sx={{ maxHeight: 300, overflow: 'auto', mb: 2 }}>
+                    {allProcesses.map((fsp) => (
+                      <ListItem
+                        key={fsp.id}
+                        button
+                        onClick={() => handleAddProcess(fsp.id)}
+                        sx={{
+                          border: 1,
+                          borderColor: 'divider',
+                          borderRadius: '8px',
+                          mb: 1,
+                          '&:hover': { bgcolor: 'grey.50' }
+                        }}
+                      >
+                        <ListItemText primary={fsp.name} secondary={fsp.path} />
+                      </ListItem>
+                    ))}
+                  </List>
+                </>
+              )}
+
+              <Button size="small" onClick={() => { setShowAddProcess(false); setViewMode('suggested'); }}>Cancel</Button>
             </Box>
           )}
         </Box>
@@ -950,33 +1036,16 @@ const ProcessDetailDrawer: React.FC<ProcessDetailDrawerProps> = ({ open, onClose
       </Box>
 
       <Box sx={{ p: 2, mt: 'auto', borderTop: 1, borderColor: 'divider' }}>
-        {process.mappedStatus === 'Mapped' && (
-          <Button
-            variant="outlined"
-            color="primary"
-            fullWidth
-            sx={{ mb: 1 }}
-            startIcon={<VisibilityIcon />}
-            onClick={() => setShowMappingDialog(true)}
-          >
-            View Future Mapping
-          </Button>
-        )}
-        {(!process.mappedStatus || process.mappedStatus === 'Unmapped') && onNavigateToMapping && (
-          <Button
-            variant="contained"
-            color="warning"
-            fullWidth
-            sx={{ mb: 1 }}
-            startIcon={<LinkIcon />}
-            onClick={() => {
-              onNavigateToMapping();
-              onClose();
-            }}
-          >
-            Link to Future Process
-          </Button>
-        )}
+        <Button
+          variant={process.mappedStatus === 'Mapped' ? 'outlined' : 'contained'}
+          color={process.mappedStatus === 'Mapped' ? 'primary' : 'warning'}
+          fullWidth
+          sx={{ mb: 1 }}
+          startIcon={process.mappedStatus === 'Mapped' ? <VisibilityIcon /> : <LinkIcon />}
+          onClick={() => setShowMappingDialog(true)}
+        >
+          {process.mappedStatus === 'Mapped' ? 'View Future Mapping' : 'Link to Future Process'}
+        </Button>
         <Button variant="contained" fullWidth sx={{ mb: 1 }}>
           Edit Process
         </Button>
